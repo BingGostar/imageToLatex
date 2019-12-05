@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Hello World!</title>
+</head>
+<body>
+<div>
+    <button id="js-capture">Capture Screen</button>
+    <button id="js-clean">clean</button>
+</div>  
+<br/>
+<div>&nbsp;</div>
+<img id="image" width="500" height="300">
+<div>&nbsp;</div>
+<div>
+    <input id="input" size="100" width="200"/>
+</div>
+<div>&nbsp;</div>
+<div>
+    <button id="copy">copy</button>
+</div>
+<script>
+    const { ipcRenderer } = require('electron')
+    var formula = ''
+    document.getElementById('js-capture').addEventListener('click', ()=>{
+        ipcRenderer.send('capture-screen')
+    })
+
+    document.getElementById('js-clean').addEventListener('click', ()=>{
+        ipcRenderer.send('capture-clean')
+    })
+
+    ipcRenderer.on('getImg', (e,{url,w,h})=>{
+            w = w>800?800:w
+            h = h>400?400:h
+            document.getElementById('image').setAttribute('src',url)
+            document.getElementById('image').setAttribute('width',w)
+            document.getElementById('image').setAttribute('height',h)
+            if (url == '') {
+                formula = ''
+                document.getElementById('input').setAttribute('value',formula)
+            }else {
+                ipcRenderer.send("show")
+                const tencentcloud = require("tencentcloud-sdk-nodejs");
+                const OcrClient = tencentcloud.ocr.v20181119.Client;
+                const models = tencentcloud.ocr.v20181119.Models;
+
+                const Credential = tencentcloud.common.Credential;
+                const ClientProfile = tencentcloud.common.ClientProfile;
+                const HttpProfile = tencentcloud.common.HttpProfile;
+
+                let cred = new Credential("AKIDaAJKI7BNlrpCOOzxUo8QJ2WifPzM3tuk", "p3IcgYAtAdIkTGCvaXJEvSmz3vfz87rM");
+                let httpProfile = new HttpProfile();
+                httpProfile.endpoint = "ocr.tencentcloudapi.com";
+                let clientProfile = new ClientProfile();
+                clientProfile.httpProfile = httpProfile;
+                let client = new OcrClient(cred, "ap-beijing", clientProfile);
+
+                let req = new models.FormulaOCRRequest();
+
+                let params = `{"ImageBase64":"${url}"}`
+                req.from_json_string(params);
+
+
+                client.FormulaOCR(req, function(errMsg, response) {
+                    if (errMsg) {
+                        ipcRenderer.send("console", errMsg)
+                        formula = ''
+                        return;
+                    }
+                    formula = JSON.parse(response.to_json_string()).FormulaInfos[0].DetectedText
+                    // ipcRenderer.send('console', formula)
+                    // console.log(response.to_json_string());
+                    // formula = formula.replace(/(?<!\\w+)\s+/g, '')
+                    document.getElementById('input').setAttribute('value',formula)
+                });
+            }
+            
+
+    })
+
+
+    document.getElementById('copy').addEventListener('click', ()=>{
+        ipcRenderer.send('clipboard', formula)
+    })
+
+</script>
+</body>
+</html>
